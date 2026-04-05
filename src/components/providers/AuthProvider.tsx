@@ -25,9 +25,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const response = await api<{ users: UserProfile[] }>('/users');
+      const response = await api<{ users: UserProfile[] }>('/users/me');
       if (response.users && response.users.length > 0) {
-        return response.users;
+        return response.user;
       }
     } catch {
       // Not admin or not authenticated
