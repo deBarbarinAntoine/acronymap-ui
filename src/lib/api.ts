@@ -82,6 +82,9 @@ export const authApi = {
 // ─── User Management Endpoints ──────────────────────────────────────────────
 
 export const userApi = {
+  getMe: () =>
+    api<{ user: User }>('/users/me'),
+
   getAll: () =>
     api<{ users: User[] }>('/users'),
 

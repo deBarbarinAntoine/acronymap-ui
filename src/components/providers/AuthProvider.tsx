@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { api, authApi, userApi, User as ApiUser } from '@/lib/api';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authApi, userApi, User as ApiUser } from '@/lib/api';
 
 export type UserProfile = ApiUser;
 
@@ -23,77 +23,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchCurrentUser = useCallback(async () => {
-    try {
-      const response = await api<{ users: UserProfile[] }>('/users/me');
-      if (response.user) {
-        return response.user;
-      }
-    } catch {
-      // Not admin or not authenticated
-    }
-    return null;
-  }, []);
-
+  // 2. Simplified boot check
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const users = await fetchCurrentUser();
-        if (users) {
-          // User is admin, try to find their info or use first user
-          const storedEmail = sessionStorage.getItem('acronymap_email');
-          const currentUser = storedEmail
-            ? users.find(u => u.email === storedEmail)
-            : users[0];
-          if (currentUser) {
-            setUser(currentUser);
-          }
+        const response = await userApi.getMe();
+        if (response && response.user) {
+          setUser(response.user); // Extract the inner .user object!
         }
-      } catch {
-        // Not authenticated
+      } catch (error) {
+        // Silently catch the 401 Unauthorized error when not logged in
       } finally {
         setIsLoading(false);
       }
     };
 
     checkAuth();
-  }, [fetchCurrentUser]);
+  }, []); // Empty dependency array is perfect here for mount
 
+  // 3. Simplified Login
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
       await authApi.login(email, password);
-      sessionStorage.setItem('acronymap_email', email);
-
-      // Try to fetch user data (works if admin)
-      const users = await fetchCurrentUser();
-      if (users) {
-        const currentUser = users.find(u => u.email === email) || users[0];
-        setUser(currentUser);
-      } else {
-        // Non-admin user - store minimal profile
-        setUser({
-          id: '',
-          email,
-          profile: 'standard',
-          is_active: true,
-          created_at: new Date().toISOString(),
-        });
+      // After successful login cookie is set, fetch the user!
+      const response = await userApi.getMe();
+      if (response && response.user) {
+        setUser(response.user); // Extract the inner .user object!
       }
-    } catch (error) {
-      sessionStorage.removeItem('acronymap_email');
-      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
+  // 4. Simplified Logout
   const logout = async () => {
     try {
       await authApi.logout();
     } finally {
-      setUser(null);
-      sessionStorage.removeItem('acronymap_email');
+      setUser(null); 
     }
   };
 
@@ -101,7 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       await authApi.register(email, password);
-      // User created as inactive - they need admin approval
     } finally {
       setIsLoading(false);
     }
@@ -109,21 +76,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateUserEmail = async (email: string) => {
     if (!user) throw new Error('Not authenticated');
-
     await userApi.updateEmail(email);
-    sessionStorage.setItem('acronymap_email', email);
-    setUser({ ...user, email });
+    setUser({ ...user, email }); 
   };
 
   const refreshUser = async () => {
-    if (!user) return;
-
-    const users = await fetchCurrentUser();
-    if (users) {
-      const currentUser = users.find(u => u.email === user.email);
-      if (currentUser) {
-        setUser(currentUser);
+    try {
+      const response = await userApi.getMe();
+      if (response && response.user) {
+        setUser(response.user);
       }
+    } catch {
+      setUser(null); // If refresh fails (e.g., cookie expired), clear state
     }
   };
 
