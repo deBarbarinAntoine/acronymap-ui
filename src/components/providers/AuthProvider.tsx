@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchCurrentUser = useCallback(async () => {
     try {
       const response = await api<{ users: UserProfile[] }>('/users/me');
-      if (response.users && response.users.length > 0) {
+      if (response.user) {
         return response.user;
       }
     } catch {
